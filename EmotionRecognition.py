@@ -32,15 +32,8 @@ class face_emotion():
         if len(faces) != 0:
             for i in range(len(faces)):  # 对每个人脸都标出68个特征点
                 for k, d in enumerate(faces):  # enumerate方法同时返回数据对象的索引和数据，k为索引，d为faces中的对象
-                    cv2.rectangle(im_rd,
-                                  (d.left(), d.top()),
-                                  (d.right(), d.bottom()),
-                                  (0, 0, 255))  # 用红色矩形框出人脸
                     self.face_width = d.right() - d.left()  # 计算人脸热别框边长
                     shape = self.predictor(im_rd, d)  # 使用预测器得到68点数据的坐标
-                    # 圆圈显示每个特征点
-                    for i in range(68):
-                        cv2.circle(im_rd, (shape.part(i).x, shape.part(i).y), 2, (0, 255, 0), -1, 8)
                     # 分析任意n点的位置关系来作为表情识别的依据
                     mouth_higth = (shape.part(66).y - shape.part(62).y) / self.face_width  # 嘴巴张开程度
                     # 通过两个眉毛上的10个特征点，分析挑眉程度和皱眉程度
