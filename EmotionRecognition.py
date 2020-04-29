@@ -16,10 +16,10 @@ DATA_PATH = "shape_predictor_68_face_landmarks.dat"
 IMAGE_PATH = "test.jpg"
 
 
-class face_emotion():
+class EmotionRecognition:
     def __init__(self):
         self.detector = dlib.get_frontal_face_detector()  # 使用特征提取器get_frontal_face_detector
-        self.predictor = dlib.shape_predictor(DATA_PATH)  # dlib的68点模型，使用作者训练好的特征预测器
+        self.predictor = dlib.shape_predictor(DATA_PATH)  # dlib的68点模型，使用训练好的特征预测器
 
     def learning_face(self, path):
         # 眉毛直线拟合数据缓冲
@@ -32,10 +32,10 @@ class face_emotion():
         if len(faces) != 0:
             for i in range(len(faces)):  # 对每个人脸都标出68个特征点
                 for k, d in enumerate(faces):  # enumerate方法同时返回数据对象的索引和数据，k为索引，d为faces中的对象
-                    self.face_width = d.right() - d.left()  # 计算人脸热别框边长
+                    face_width = d.right() - d.left()  # 计算人脸热别框边长
                     shape = self.predictor(im_rd, d)  # 使用预测器得到68点数据的坐标
                     # 分析任意n点的位置关系来作为表情识别的依据
-                    mouth_higth = (shape.part(66).y - shape.part(62).y) / self.face_width  # 嘴巴张开程度
+                    mouth_higth = (shape.part(66).y - shape.part(62).y) / face_width  # 嘴巴张开程度
                     # 通过两个眉毛上的10个特征点，分析挑眉程度和皱眉程度
                     brow_sum = 0  # 高度之和
                     frown_sum = 0  # 两边眉毛距离之和
@@ -47,18 +47,18 @@ class face_emotion():
                     tempx = np.array(line_brow_x)
                     tempy = np.array(line_brow_y)
                     z1 = np.polyfit(tempx, tempy, 1)  # 拟合成一次直线
-                    self.brow_k = -round(z1[0], 3)  # 拟合出曲线的斜率和实际眉毛的倾斜方向是相反的
+                    brow_k = -round(z1[0], 3)  # 拟合出曲线的斜率和实际眉毛的倾斜方向是相反的
                     # 眼睛睁开程度
                     eye_sum = (shape.part(41).y - shape.part(37).y + shape.part(40).y - shape.part(38).y +
                                shape.part(47).y - shape.part(43).y + shape.part(46).y - shape.part(44).y)
-                    eye_hight = (eye_sum / 4) / self.face_width
+                    eye_hight = (eye_sum / 4) / face_width
                     if round(mouth_higth >= 0.03):
                         if eye_hight >= 0.056:
                             return str({"state": "success", "result": "amazing"})   # 惊讶
                         else:
                             return str({"state": "success", "result": "happy"})     # 开心
                     else:
-                        if self.brow_k <= -0.3:
+                        if brow_k <= -0.3:
                             return str({"state": "success", "result": "angry"})     # 生气
                         else:
                             return str({"state": "success", "result": "nature"})    # 正常
@@ -68,7 +68,7 @@ class face_emotion():
 
 app = Flask(__name__)
 
-my_face = face_emotion()
+my_face = EmotionRecognition()
 file_paths = ""
 
 
@@ -83,11 +83,11 @@ def get_frame():
     file_path = r'C:/Users/xiang/Downloads/'
     if upload_file:
         # 地址拼接
-        file_paths = os.path.join(file_path, file_name)
+        file_path_add = os.path.join(file_path, file_name)
         # 保存接收的图片到桌面
-        upload_file.save(file_paths)
+        upload_file.save(file_path_add)
         # 进行人脸识别
-        result = my_face.learning_face(file_paths)
+        result = my_face.learning_face(file_path_add)
         # 返回结果
         return result
     else:
