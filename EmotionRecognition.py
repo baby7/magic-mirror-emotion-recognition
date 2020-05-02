@@ -12,6 +12,7 @@ import dlib
 import numpy as np
 import cv2
 from qiniu import Auth, put_file
+from qiniu import BucketManager
 import requests
 import json
 
@@ -24,6 +25,8 @@ secret_key = 'yDdNmZWUEzs2zsk46O6O5-WbZ0x1lF2r3neJ7xbO'
 q = Auth(access_key, secret_key)
 # 要上传的空间
 bucket_name = 'magic-mirror-media'
+# 初始化BucketManager
+bucket = BucketManager(q)
 
 
 class EmotionRecognition:
@@ -90,24 +93,30 @@ file_paths = ""
 # 上传到七牛云
 def upload_qiniu(path):
     # 生成上传 Token，可以指定过期时间等
-    token = q.upload_token(bucket_name, path, 3600)
+    token = q.upload_token(bucket_name, path.replace("D:/install/face_data/", ""), 3600)
     # 要上传文件的本地路径
-    ret, info = put_file(token, path.replace("C:/Users/xiang/Downloads/", ""), path)
+    ret, info = put_file(token, path.replace("D:/install/face_data/", ""), path)
+    print(info)
+
+
+# 删除处理完成的文件
+def delete_qiniu(path):
+    ret, info = bucket.delete(bucket_name, path.replace("D:/install/face_data/", ""))
     print(info)
 
 
 # 进行后端人脸情绪保存
 def send_face_data_save(path, state):
-    path = path.replace("C:/Users/xiang/Downloads/", "")
     url = 'http://62.234.97.198:8005/admin/photo/faceRegistration'
     data = {
-        'url': "https://magic-mirror-media.baby7blog.com/" + path,
+        'url': "https://magic-mirror-media.baby7blog.com/" + path.replace("D:/install/face_data/", ""),
         'state': state
     }
     print(data)
     r = requests.post(url, json=data, headers={'Content-Type': 'application/json;charset=UTF-8'})
     result = r.json()
     print(result)
+    delete_qiniu(path)
 
 
 # 定义路由
@@ -118,7 +127,7 @@ def get_frame():
     # 获取图片名
     file_name = upload_file.filename
     # 文件保存目录
-    file_path = r'C:/Users/xiang/Downloads/'
+    file_path = r'D:/install/face_data/'
     if upload_file:
         # 地址拼接
         file_path_add = os.path.join(file_path, file_name)
