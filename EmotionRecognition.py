@@ -11,9 +11,19 @@ import os
 import dlib
 import numpy as np
 import cv2
+from qiniu import Auth, put_file
+import requests
+import json
+
 
 DATA_PATH = "shape_predictor_68_face_landmarks.dat"
 IMAGE_PATH = "test.jpg"
+access_key = 'QHqjfdZsbHZaAvogeFGM8cTrurShs7UmN5LIu-iZ'
+secret_key = 'yDdNmZWUEzs2zsk46O6O5-WbZ0x1lF2r3neJ7xbO'
+# 构建鉴权对象
+q = Auth(access_key, secret_key)
+# 要上传的空间
+bucket_name = 'magic-mirror-media'
 
 
 class EmotionRecognition:
@@ -52,24 +62,52 @@ class EmotionRecognition:
                     eye_sum = (shape.part(41).y - shape.part(37).y + shape.part(40).y - shape.part(38).y +
                                shape.part(47).y - shape.part(43).y + shape.part(46).y - shape.part(44).y)
                     eye_hight = (eye_sum / 4) / face_width
+                    upload_qiniu(path)
                     if round(mouth_higth >= 0.03):
                         if eye_hight >= 0.056:
-                            return str({"state": "success", "result": "amazing"})   # 惊讶
+                            send_face_data_save(path, "3")
+                            return json.dumps({"state": "success", "result": "amazing"})   # 惊讶
                         else:
-                            return str({"state": "success", "result": "happy"})     # 开心
+                            send_face_data_save(path, "4")
+                            return json.dumps({"state": "success", "result": "happy"})     # 开心
                     else:
                         if brow_k <= -0.3:
-                            return str({"state": "success", "result": "angry"})     # 生气
+                            send_face_data_save(path, "1")
+                            return json.dumps({"state": "success", "result": "angry"})     # 生气
                         else:
-                            return str({"state": "success", "result": "nature"})    # 正常
-                break                                                               # 只识别一张人脸
-        return str({"state": "error", "result": "no face"})                         # 未识别到人脸
+                            send_face_data_save(path, "2")
+                            return json.dumps({"state": "success", "result": "nature"})    # 正常
+                break                                                                      # 只识别一张人脸
+        return json.dumps({"state": "error", "result": "no face"})                         # 未识别到人脸
 
 
 app = Flask(__name__)
 
 my_face = EmotionRecognition()
 file_paths = ""
+
+
+# 上传到七牛云
+def upload_qiniu(path):
+    # 生成上传 Token，可以指定过期时间等
+    token = q.upload_token(bucket_name, path, 3600)
+    # 要上传文件的本地路径
+    ret, info = put_file(token, path.replace("C:/Users/xiang/Downloads/", ""), path)
+    print(info)
+
+
+# 进行后端人脸情绪保存
+def send_face_data_save(path, state):
+    path = path.replace("C:/Users/xiang/Downloads/", "")
+    url = 'http://62.234.97.198:8005/admin/photo/faceRegistration'
+    data = {
+        'url': "https://magic-mirror-media.baby7blog.com/" + path,
+        'state': state
+    }
+    print(data)
+    r = requests.post(url, json=data, headers={'Content-Type': 'application/json;charset=UTF-8'})
+    result = r.json()
+    print(result)
 
 
 # 定义路由
@@ -91,7 +129,7 @@ def get_frame():
         # 返回结果
         return result
     else:
-        return str({"state": "error", "result": "no photo"})
+        return json.dumps({"state": "error", "result": "no photo"})
 
 
 if __name__ == "__main__":
