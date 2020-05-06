@@ -31,57 +31,46 @@ bucket = BucketManager(q)
 
 class EmotionRecognition:
     def __init__(self):
-        self.detector = dlib.get_frontal_face_detector()  # 使用特征提取器get_frontal_face_detector
-        self.predictor = dlib.shape_predictor(DATA_PATH)  # dlib的68点模型，使用训练好的特征预测器
+        self.detector = dlib.get_frontal_face_detector()            # 使用特征提取器get_frontal_face_detector
+        self.predictor = dlib.shape_predictor(DATA_PATH)            # dlib的68点模型，使用训练好的特征预测器
 
     def learning_face(self, path):
-        # 眉毛直线拟合数据缓冲
-        line_brow_x = []
-        line_brow_y = []
-        im_rd = cv2.imread(path, 1)
-        img_gray = cv2.cvtColor(im_rd, cv2.COLOR_RGB2GRAY)  # 取灰度
-        faces = self.detector(img_gray, 0)  # 使用人脸检测器检测每一帧图像中的人脸。并返回人脸数rects
-        # 如果检测到人脸
-        if len(faces) != 0:
-            for i in range(len(faces)):  # 对每个人脸都标出68个特征点
-                for k, d in enumerate(faces):  # enumerate方法同时返回数据对象的索引和数据，k为索引，d为faces中的对象
-                    face_width = d.right() - d.left()  # 计算人脸热别框边长
-                    shape = self.predictor(im_rd, d)  # 使用预测器得到68点数据的坐标
-                    # 分析任意n点的位置关系来作为表情识别的依据
-                    mouth_higth = (shape.part(66).y - shape.part(62).y) / face_width  # 嘴巴张开程度
-                    # 通过两个眉毛上的10个特征点，分析挑眉程度和皱眉程度
-                    brow_sum = 0  # 高度之和
-                    frown_sum = 0  # 两边眉毛距离之和
+        im_read = cv2.imread(path, 1)
+        face_list = self.detector(cv2.cvtColor(im_read, cv2.COLOR_RGB2GRAY), 0)   # 对灰度图像使用检测器检测
+        if len(face_list) != 0:                                     # 检测器检测到人脸
+            for i in range(len(face_list)):                         # 获取68个特征点
+                for k, d in enumerate(face_list):                   # 获取索引和数据，k为索引，d为对象
+                    box_width = d.right() - d.left()                # 计算人脸框边长
+                    appear = self.predictor(im_read, d)             # 获取68个特征点坐标
+                    mouth_higth = (appear.part(66).y - appear.part(62).y) / box_width
+                    # 眉毛直线拟合列表
+                    brow_x = []
+                    brow_y = []
                     for j in range(17, 21):
-                        brow_sum += (shape.part(j).y - d.top()) + (shape.part(j + 5).y - d.top())
-                        frown_sum += shape.part(j + 5).x - shape.part(j).x
-                        line_brow_x.append(shape.part(j).x)
-                        line_brow_y.append(shape.part(j).y)
-                    tempx = np.array(line_brow_x)
-                    tempy = np.array(line_brow_y)
-                    z1 = np.polyfit(tempx, tempy, 1)  # 拟合成一次直线
-                    brow_k = -round(z1[0], 3)  # 拟合出曲线的斜率和实际眉毛的倾斜方向是相反的
-                    # 眼睛睁开程度
-                    eye_sum = (shape.part(41).y - shape.part(37).y + shape.part(40).y - shape.part(38).y +
-                               shape.part(47).y - shape.part(43).y + shape.part(46).y - shape.part(44).y)
-                    eye_hight = (eye_sum / 4) / face_width
-                    upload_qiniu(path)
+                        brow_x.append(appear.part(j).x)
+                        brow_y.append(appear.part(j).y)
+                    z1 = np.polyfit(np.array(brow_x), np.array(brow_y), 1)
+                    brow_k = -round(z1[0], 3)                       # 拟合成一条直线
+                    eye_hight = ((appear.part(41).y - appear.part(37).y + appear.part(40).y - appear.part(38).y +
+                               appear.part(47).y - appear.part(43).y + appear.part(46).y - appear.part(44).y)
+                                 / 4) / box_width                   # 获取眼睛睁开大小
+                    upload_qiniu(path)                              # 上传至图床
                     if round(mouth_higth >= 0.03):
                         if eye_hight >= 0.056:
-                            send_face_data_save(path, "3")
-                            return json.dumps({"state": "success", "result": "amazing"})   # 惊讶
+                            send_face_data_save(path, "3")          # 惊讶
+                            return json.dumps({"state": "success", "result": "amazing"})
                         else:
-                            send_face_data_save(path, "4")
-                            return json.dumps({"state": "success", "result": "happy"})     # 开心
+                            send_face_data_save(path, "4")          # 开心
+                            return json.dumps({"state": "success", "result": "happy"})
                     else:
                         if brow_k <= -0.3:
-                            send_face_data_save(path, "1")
-                            return json.dumps({"state": "success", "result": "angry"})     # 生气
+                            send_face_data_save(path, "1")          # 生气
+                            return json.dumps({"state": "success", "result": "angry"})
                         else:
-                            send_face_data_save(path, "2")
-                            return json.dumps({"state": "success", "result": "nature"})    # 正常
-                break                                                                      # 只识别一张人脸
-        return json.dumps({"state": "error", "result": "no face"})                         # 未识别到人脸
+                            send_face_data_save(path, "2")          # 正常
+                            return json.dumps({"state": "success", "result": "nature"})
+                break                                               # 只识别一张人脸
+        return json.dumps({"state": "error", "result": "no face"})  # 未识别到人脸
 
 
 app = Flask(__name__)
